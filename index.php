@@ -42,11 +42,13 @@ $routes = [
         '' => 'home',
         'api/test' => 'test',
         'api/users' => 'getUsers',
+         'api/products' => 'getProducts',
     ],
     'POST' => [
         'api/register' => 'register',
         'api/login' => 'login',
     ]
+
 ];
 
 // Handle the request
@@ -91,6 +93,12 @@ if (isset($routes[$method][$path])) {
             require_once __DIR__ . '/controllers/AuthController.php';
             $controller = new AuthController();
             $controller->login();
+            break;
+
+        case 'getProducts':
+            require_once __DIR__ . '/controllers/ProductController.php';
+            $controller = new ProductController();
+            $controller->getAll();
             break;
             
         default:
