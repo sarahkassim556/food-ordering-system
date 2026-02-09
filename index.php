@@ -43,6 +43,7 @@ $routes = [
         'api/test' => 'test',
         'api/users' => 'getUsers',
          'api/products' => 'getProducts',
+         'api/products/category/{category}' => 'getProductsByCategory'
     ],
     'POST' => [
         'api/register' => 'register',
@@ -99,6 +100,21 @@ if (isset($routes[$method][$path])) {
             require_once __DIR__ . '/controllers/ProductController.php';
             $controller = new ProductController();
             $controller->getAll();
+            break;
+
+        case 'getProducts':
+            require_once __DIR__ . '/controllers/ProductController.php';
+            $controller = new ProductController();
+            $controller->getAll();
+            break;
+
+        case 'getProductsByCategory':
+            require_once __DIR__ . '/controllers/ProductController.php';
+            $controller = new ProductController();
+            // Extract category from path
+            $pathParts = explode('/', $path);
+            $category = end($pathParts);
+            $controller->getByCategory($category);
             break;
             
         default:
