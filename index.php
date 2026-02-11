@@ -1,134 +1,169 @@
 <?php
-// Enable error reporting
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
+header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
-// Include configuration
-require_once __DIR__ . '/config/database.php';
-
-// Set CORS headers
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
-header("Content-Type: application/json; charset=UTF-8");
-
-// Handle preflight OPTIONS request
-if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
+// Handle preflight requests
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit();
 }
 
-// Get request method and URI
-$method = $_SERVER['REQUEST_METHOD'];
+require_once 'config/database.php';
+require_once 'config/cors.php';
+
+// Simple router
 $request_uri = $_SERVER['REQUEST_URI'];
+$method = $_SERVER['REQUEST_METHOD'];
 
 // Remove base path
 $base_path = '/food-ordering-system/backend';
-$path = str_replace($base_path, '', $request_uri);
-$path = trim($path, '/');
+$request_uri = str_replace($base_path, '', $request_uri);
 
-// Remove index.php if present
-if (strpos($path, 'index.php') === 0) {
-    $path = substr($path, strlen('index.php'));
-    $path = trim($path, '/');
-}
+// Parse query parameters
+$url_parts = parse_url($request_uri);
+$path = $url_parts['path'];
+$query_params = isset($url_parts['query']) ? $url_parts['query'] : '';
 
-// Remove query string
-$path = explode('?', $path)[0];
+// Route the request
+switch ($path) {
+    case '/api/auth/register':
+        require_once 'controllers/AuthController.php';
+        $controller = new AuthController();
+        if ($method === 'POST') {
+            echo $controller->register();
+        } else {
+            http_response_code(405);
+            echo json_encode(['error' => 'Method not allowed']);
+        }
+        break;
+        
+    case '/api/auth/login':
+        require_once 'controllers/AuthController.php';
+        $controller = new AuthController();
+        if ($method === 'POST') {
+            echo $controller->login();
+        } else {
+            http_response_code(405);
+            echo json_encode(['error' => 'Method not allowed']);
+        }
+        break;
+        
+    case '/api/products':
+        require_once 'controllers/ProductController.php';
+        $controller = new ProductController();
+        if ($method === 'GET') {
+            // Check for search or category filter
+            parse_str($query_params, $params);
+            if (isset($params['search'])) {
+                echo $controller->search($params['search']);
+            } elseif (isset($params['category'])) {
+                echo $controller->getByCategory($params['category']);
+            } else {
+                echo $controller->getAllProducts();
+            }
+            }
+        } elseif ($method === 'POST') {
+            echo $controller->create();
+        } else {
+            http_response_code(405);
+            echo json_encode(['error' => 'Method not allowed']);
+        }
+        break;
+        
+    case '/api/categories':
+        require_once 'controllers/CategoryController.php';
+        $controller = new CategoryController();
+        if ($method === 'GET') {
+            echo $controller->getAllCategories();
+        } else {
+            http_response_code(405);
+            echo json_encode(['error' => 'Method not allowed']);
+        }
+        break;
+        
+    case '/api/cart':
+        require_once 'controllers/CartController.php';
+        $controller = new CartController();
+        switch ($method) {
+            case 'GET':
+                echo $controller->getCart();
+                break;
+            case 'POST':
+                echo $controller->addToCart();
+                break;
+            case 'PUT':
+                echo $controller->updateCartItem();
+                break;
+            case 'DELETE':
+                echo $controller->clearCart();
+                break;
+            default:
+                http_response_code(405);
+                echo json_encode(['error' => 'Method not allowed']);
+        }
+        break;
+        
+    case '/api/orders':
+        require_once 'controllers/OrderController.php';
+        $controller = new OrderController();
+        if ($method === 'POST') {
+            echo $controller->placeOrder();
+        } elseif ($method === 'GET') {
+            echo $controller->getUserOrders();
+        } else {
+            http_response_code(405);
+            echo json_encode(['error' => 'Method not allowed']);
+        }
+        break;
 
-// Define routes
-$routes = [
-    'GET' => [
-        '' => 'home',
-        'api/test' => 'test',
-        'api/users' => 'getUsers',
-         'api/products' => 'getProducts',
-         'api/products/category/{category}' => 'getProductsByCategory'
-    ],
-    'POST' => [
-        'api/register' => 'register',
-        'api/login' => 'login',
-    ]
+    case '/api/admin/orders':
+        require_once 'controllers/OrderController.php';
+        $controller = new OrderController();
+        if ($method === 'GET') {
+            echo $controller->getAllOrders();
+        } else {
+            http_response_code(405);
+            echo json_encode(['error' => 'Method not allowed']);
+        }
+        break;
 
-];
+    // Cart routes commented out as we are moving to LocalStorage for simplicity
+    /*
+    case '/api/cart':
+       // ...
+    */
 
-// Handle the request
-if (isset($routes[$method][$path])) {
-    $action = $routes[$method][$path];
-    
-    switch ($action) {
-        case 'home':
-            echo json_encode([
-                'success' => true,
-                'message' => 'foof-ordering-system API v1.0',
-                'endpoints' => [
-                    'GET /api/test' => 'Test API connection',
-                    'POST /api/register' => 'Register new user',
-                    'POST /api/login' => 'Login user',
-                    'GET /api/users' => 'Get all users (admin)'
-                ]
-            ]);
-            break;
-            
-        case 'test':
-            echo json_encode([
-                'success' => true,
-                'message' => 'API is working perfectly!',
-                'timestamp' => date('Y-m-d H:i:s')
-            ]);
-            break;
-            
-        case 'getUsers':
-            require_once __DIR__ . '/controllers/UserController.php';
-            $controller = new UserController();
-            $controller->getAll();
-            break;
-            
-        case 'register':
-            require_once __DIR__ . '/controllers/AuthController.php';
-            $controller = new AuthController();
-            $controller->register();
-            break;
-            
-        case 'login':
-            require_once __DIR__ . '/controllers/AuthController.php';
-            $controller = new AuthController();
-            $controller->login();
-            break;
-
-        case 'getProducts':
-            require_once __DIR__ . '/controllers/ProductController.php';
+        
+    default:
+        // Check for product details route
+        if (preg_match('/^\/api\/products\/(\d+)$/', $path, $matches)) {
+            require_once 'controllers/ProductController.php';
             $controller = new ProductController();
-            $controller->getAll();
-            break;
-
-        case 'getProducts':
-            require_once __DIR__ . '/controllers/ProductController.php';
-            $controller = new ProductController();
-            $controller->getAll();
-            break;
-
-        case 'getProductsByCategory':
-            require_once __DIR__ . '/controllers/ProductController.php';
-            $controller = new ProductController();
-            // Extract category from path
-            $pathParts = explode('/', $path);
-            $category = end($pathParts);
-            $controller->getByCategory($category);
-            break;
-            
-        default:
+            if ($method === 'GET') {
+                echo $controller->getProduct($matches[1]);
+            } elseif ($method === 'PUT') {
+                echo $controller->update($matches[1]);
+            } elseif ($method === 'DELETE') {
+                echo $controller->delete($matches[1]);
+            } else {
+                http_response_code(405);
+                echo json_encode(['error' => 'Method not allowed']);
+            }
+        } elseif (preg_match('/^\/api\/admin\/orders\/(\d+)$/', $path, $matches)) {
+            require_once 'controllers/OrderController.php';
+            $controller = new OrderController();
+            if ($method === 'PUT') {
+                echo $controller->updateOrderStatus($matches[1]);
+            } else {
+                http_response_code(405);
+                echo json_encode(['error' => 'Method not allowed']);
+            }
+        } else {
             http_response_code(404);
-            echo json_encode(['success' => false, 'error' => 'Action not implemented']);
-    }
-} else {
-    http_response_code(404);
-    echo json_encode([
-        'success' => false,
-        'error' => 'Route not found',
-        'requested' => $path ?: '(empty)',
-        'method' => $method,
-        'available_routes' => $routes[$method] ?? []
-    ]);
+            echo json_encode(['error' => 'Endpoint not found']);
+        }
+        break;
 }
 ?>

@@ -1,117 +1,138 @@
 <?php
-require_once __DIR__ . '/../config/database.php';
+require_once '../models/User.php';
 
 class AuthController {
-    private $conn;
-    private $table = 'users';
+    private $db;
+    private $user;
 
     public function __construct() {
+        require_once '../config/database.php';
         $database = new Database();
-        $this->conn = $database->getConnection();
+        $this->db = $database->getConnection();
+        $this->user = new User($this->db);
     }
 
+    // User registration
     public function register() {
-        $data = json_decode(file_get_contents('php://input'), true);
-        
-        // Validation
-        if (empty($data['username']) || empty($data['email']) || empty($data['password'])) {
-            echo json_encode([
+        $data = json_decode(file_get_contents("php://input"));
+
+        // Validate input
+        if (empty($data->email) || empty($data->password) || empty($data->username)) {
+            http_response_code(400);
+            return json_encode([
                 'success' => false,
-                'error' => 'Username, email and password are required'
+                'message' => 'Email, password, and username are required'
             ]);
-            return;
         }
-        
-        // Check if email exists
-        $checkQuery = "SELECT id FROM " . $this->table . " WHERE email = ?";
-        $checkStmt = $this->conn->prepare($checkQuery);
-        $checkStmt->execute([$data['email']]);
-        
-        if ($checkStmt->rowCount() > 0) {
-            echo json_encode([
+
+        // Check if email already exists
+        $this->user->email = $data->email;
+        if ($this->user->emailExists()) {
+            http_response_code(409);
+            return json_encode([
                 'success' => false,
-                'error' => 'Email already registered'
+                'message' => 'Email already exists'
             ]);
-            return;
         }
-        
-        // Insert user
-        $query = "INSERT INTO " . $this->table . " 
-                  (username, email, password, full_name, role) 
-                  VALUES (?, ?, ?, ?, ?)";
-        
-        $hashedPassword = password_hash($data['password'], PASSWORD_BCRYPT);
-        $fullName = $data['full_name'] ?? '';
-        $role = 'customer';
-        
-        $stmt = $this->conn->prepare($query);
-        
-        if ($stmt->execute([$data['username'], $data['email'], $hashedPassword, $fullName, $role])) {
-            $userId = $this->conn->lastInsertId();
-            
-            echo json_encode([
+
+        // Set user properties
+        $this->user->username = $data->username;
+        $this->user->email = $data->email;
+        $this->user->password = $data->password;
+        $this->user->full_name = $data->full_name ?? '';
+        $this->user->phone = $data->phone ?? '';
+        $this->user->role_id = 2; // Default role: customer
+
+        // Create user
+        if ($this->user->create()) {
+            http_response_code(201);
+            return json_encode([
                 'success' => true,
-                'message' => 'User registered successfully',
-                'data' => [
-                    'id' => $userId,
-                    'username' => $data['username'],
-                    'email' => $data['email'],
-                    'role' => $role
-                ]
+                'message' => 'User registered successfully'
             ]);
         } else {
-            echo json_encode([
+            http_response_code(500);
+            return json_encode([
                 'success' => false,
-                'error' => 'Registration failed'
+                'message' => 'Registration failed'
             ]);
         }
     }
 
+    // User login
     public function login() {
-        $data = json_decode(file_get_contents('php://input'), true);
-        
-        if (empty($data['email']) || empty($data['password'])) {
-            echo json_encode([
+        $data = json_decode(file_get_contents("php://input"));
+
+        // Validate input
+        if (empty($data->email) || empty($data->password)) {
+            http_response_code(400);
+            return json_encode([
                 'success' => false,
-                'error' => 'Email and password required'
+                'message' => 'Email and password are required'
             ]);
-            return;
         }
-        
-        $query = "SELECT id, username, email, password, role 
-                  FROM " . $this->table . " 
-                  WHERE email = ?";
-        
-        $stmt = $this->conn->prepare($query);
-        $stmt->execute([$data['email']]);
-        
-        if ($stmt->rowCount() > 0) {
-            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        // Check if user exists
+        $this->user->email = $data->email;
+        if (!$this->user->emailExists()) {
+            http_response_code(401);
+            return json_encode([
+                'success' => false,
+                'message' => 'Invalid credentials'
+            ]);
+        }
+
+        // Verify password
+        if (password_verify($data->password, $this->user->password)) {
+            // Generate JWT token (simplified - in real app use proper JWT)
+            $token = $this->generateToken($this->user->id);
             
-            if (password_verify($data['password'], $user['password'])) {
-                echo json_encode([
-                    'success' => true,
-                    'message' => 'Login successful',
-                    'data' => [
-                        'id' => $user['id'],
-                        'username' => $user['username'],
-                        'email' => $user['email'],
-                        'role' => $user['role'],
-                        'token' => base64_encode($user['id'] . '_' . time())
-                    ]
-                ]);
-            } else {
-                echo json_encode([
-                    'success' => false,
-                    'error' => 'Invalid password'
-                ]);
-            }
+            // Get user details (excluding password)
+            $userDetails = [
+                'id' => $this->user->id,
+                'username' => $this->user->username,
+                'email' => $this->user->email,
+                'full_name' => $this->user->full_name,
+                'role_id' => $this->user->role_id
+            ];
+
+            http_response_code(200);
+            return json_encode([
+                'success' => true,
+                'message' => 'Login successful',
+                'token' => $token,
+                'user' => $userDetails
+            ]);
         } else {
-            echo json_encode([
+            http_response_code(401);
+            return json_encode([
                 'success' => false,
-                'error' => 'User not found'
+                'message' => 'Invalid credentials'
             ]);
         }
+    }
+
+    // Generate simple token (for demo - use JWT in production)
+    private function generateToken($user_id) {
+        $token_data = [
+            'user_id' => $user_id,
+            'created_at' => time(),
+            'expires_at' => time() + (24 * 60 * 60) // 24 hours
+        ];
+        return base64_encode(json_encode($token_data));
+    }
+
+    // Verify token (for demo)
+    public static function verifyToken($token) {
+        try {
+            $decoded = json_decode(base64_decode($token), true);
+            if ($decoded && isset($decoded['user_id']) && $decoded['expires_at'] > time()) {
+                return $decoded['user_id'];
+            }
+        } catch (Exception $e) {
+            return false;
+        }
+        return false;
     }
 }
 ?>
