@@ -1,13 +1,13 @@
 <?php
-require_once '../models/Cart.php';
-require_once '../controllers/AuthController.php';
+require_once __DIR__ . '/../models/Cart.php';
+require_once __DIR__ . '/../controllers/AuthController.php';
 
 class CartController {
     private $db;
     private $cart;
 
     public function __construct() {
-        require_once '../config/database.php';
+        require_once __DIR__ . '/../config/database.php';
         $database = new Database();
         $this->db = $database->getConnection();
         $this->cart = new Cart($this->db);

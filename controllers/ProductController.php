@@ -1,12 +1,12 @@
 <?php
-require_once '../models/Product.php';
+require_once __DIR__ . '/../models/Product.php';
 
 class ProductController {
     private $db;
     private $product;
 
     public function __construct() {
-        require_once '../config/database.php';
+        require_once __DIR__ . '/../config/database.php';
         $database = new Database();
         $this->db = $database->getConnection();
         $this->product = new Product($this->db);
@@ -184,10 +184,7 @@ class ProductController {
             'category_id' => $row['category_id'],
             'category_name' => $row['category_name'] ?? '',
             'image' => $row['image'], // Return as is from DB
-            'is_vegetarian' => (bool) $row['is_vegetarian'],
-            'is_spicy' => (bool) $row['is_spicy'],
             'is_active' => (bool) $row['is_active'],
-            'stock_quantity' => (int) $row['stock_quantity'],
             'created_at' => $row['created_at']
         ];
     }

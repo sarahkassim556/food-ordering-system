@@ -9,11 +9,11 @@ class Product {
     public $price;
     public $category_id;
     public $image;
-    public $is_vegetarian;
-    public $is_spicy;
     public $is_active;
 
-    // ...
+    public function __construct($db) {
+        $this->conn = $db;
+    }
 
     // Get all products
     public function getAll() {

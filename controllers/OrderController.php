@@ -1,7 +1,7 @@
 <?php
-require_once '../models/Order.php';
-require_once '../models/OrderItem.php';
-require_once '../controllers/AuthController.php';
+require_once __DIR__ . '/../models/Order.php';
+require_once __DIR__ . '/../models/OrderItem.php';
+require_once __DIR__ . '/../controllers/AuthController.php';
 
 class OrderController {
     private $db;
@@ -9,7 +9,7 @@ class OrderController {
     private $orderItem;
 
     public function __construct() {
-        require_once '../config/database.php';
+        require_once __DIR__ . '/../config/database.php';
         $database = new Database();
         $this->db = $database->getConnection();
         $this->order = new Order($this->db);

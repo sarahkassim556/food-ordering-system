@@ -54,7 +54,7 @@ class User {
 
     // Check if email exists
     public function emailExists() {
-        $query = "SELECT id, username, email, password, role_id 
+        $query = "SELECT id, username, email, password, full_name, role_id 
                   FROM " . $this->table . " 
                   WHERE email = ? 
                   LIMIT 0,1";
@@ -69,6 +69,7 @@ class User {
             $this->username = $row['username'];
             $this->email = $row['email'];
             $this->password = $row['password'];
+            $this->full_name = $row['full_name'];
             $this->role_id = $row['role_id'];
             return true;
         }
